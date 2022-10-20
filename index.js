@@ -124,6 +124,10 @@ app.use("/api/chat", chatRouter);
 
 app.use("/api/user", userRouter);
 
+app.get("/", (req, res) => {
+        res.send("Its working !");
+});
+
 server.listen(process.env.PORT, () => {
         console.log(`listening on: *${process.env.PORT}`);
 });
