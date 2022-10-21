@@ -3,6 +3,8 @@ const app = express();
 const http = require("http");
 const server = http.createServer(app);
 const dotenv = require("dotenv");
+const port = process.env.PORT;
+// const port = 5000;
 const mongoose = require("mongoose");
 const authRouter = require("./routes/auth");
 const chatRouter = require("./routes/chat");
@@ -128,8 +130,8 @@ app.get("/", (req, res) => {
         res.send("Its working !");
 });
 
-server.listen(process.env.PORT, () => {
-        console.log(`listening on: *${process.env.PORT}`);
+server.listen(port, () => {
+        console.log(`listening on: *${port}`);
 });
 
 
