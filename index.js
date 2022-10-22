@@ -16,52 +16,24 @@ dotenv.config();
 
 const { Server } = require("socket.io");
 const Presence = require("./models/Presence");
-const User = require("./models/User");
 const SourceChat = require("./models/SourceChat");
 app.use(express.json());
 
-mongoose
-        .connect(process.env.MONGO_URL, {
-                useNewUrlParser: true,
-                useUnifiedTopology: true,
-        })
-        .then(console.log("connected to MongGoDB"))
-        .catch((error) => console.log(error));
+mongoose.connect(process.env.MONGO_URL, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+}).then(console.log("connected to MongGoDB")).catch((error) => console.log(error));
 
 
+// SocketIO
 const io = new Server(server);
 
 var listUserOnline = [];
-// SocketIO
 io.on("connection", (socket) => {
-        console.log("join app " + socket.id);
         // Join app
-        socket.on("loginSuccess", async userID => {
+        socket.on("joinApp", async userID => {
+                console.log("join app " + socket.id);
                 listUserOnline.push(new UserJoinApp(socket, userID));
-                // send data all room to user
-                let chatRooms = [];
-                const rooms = await Chat.find({ users: { $in: [userID] } });// all room
-
-                // get id of the user
-                for (const element of rooms) {
-                        let objectRoom = {};
-
-                        // room info
-                        objectRoom['room'] = element;
-
-                        // user info
-                        let listID = element.users;// list userid
-                        let targetID = userID === listID[0] ? listID[1] : listID[0];
-                        const user = await User.findOne({ _id: targetID });
-                        objectRoom['user'] = user;
-
-                        //presence
-                        const presence = await Presence.findOne({ userID: targetID });
-                        objectRoom['presence'] = presence;
-
-                        chatRooms.push(objectRoom);
-                }
-                socket.emit("chatRooms", chatRooms);
         });
 
         socket.on('getSourceChat', async data => {
@@ -99,6 +71,24 @@ io.on("connection", (socket) => {
                 }
                 socket.emit("getSourceChat", sourceChat);
         });
+
+        socket.on("addFriendRequest", async (listUserID) => {
+                // find socket
+                let index = listUserOnline.findIndex(user => user.userID === listUserID.friendID);
+                if (index == null) return;
+
+                // update request
+                let requests = [];
+                let friendRequests = await Friends.findOne({ userID: listUserID.friendID });
+                friendRequests.request.push(listUserID.userID);
+                for (const element of friendRequests.request) {
+                        let user = await User.findOne({ _id: element });
+                        requests.push(user);
+                }
+                listUserOnline[index].socket.emit("friendRequest", requests);
+                await friendRequests.save();
+        });
+
         // A user was offline 
         socket.on('disconnect', async (data) => {
                 const index = listUserOnline.findIndex(user => user.socket.id === socket.id);
@@ -121,14 +111,8 @@ io.on("connection", (socket) => {
 });
 
 app.use("/api/auth", authRouter);
-
 app.use("/api/chat", chatRouter);
-
 app.use("/api/user", userRouter);
-
-app.get("/", (req, res) => {
-        res.send("Its working !");
-});
 
 server.listen(port, () => {
         console.log(`listening on: *${port}`);
