@@ -15,6 +15,7 @@ dotenv.config();
 const { Server } = require("socket.io");
 const Presence = require("./models/Presence");
 const SourceChat = require("./models/SourceChat");
+const Room = require("./models/Room");
 app.use(express.json());
 
 mongoose.connect(process.env.MONGO_URL, {
@@ -33,14 +34,25 @@ io.on("connection", (socket) => {
                 console.log("join app " + socket.id);
                 listUserOnline.push(new UserJoinApp(socket, userID));
         });
-
+        // Get source chat by roomID
         socket.on('getSourceChat', async data => {
                 const sourceChat = await SourceChat.findOne({ idRoom: data.roomID });
                 socket.emit('getSourceChat', sourceChat ?? null);
         });
-
         // Recevie a message      
         socket.on("message", async (msg) => {
+                await Room.findOneAndUpdate(
+                        { _id: msg.idRoom },
+                        {
+                                $set: {
+                                        lastMessage: msg.message.content,
+                                        typeLastMessage: msg.message.type,
+                                        timeLastMessage: msg.message.time,
+                                },
+                        },
+                );
+                const room = await Room.findOne({ _id: msg.idRoom });
+                socket.emit("getRooms", room);
                 let sourceChat = await SourceChat.findOne({ idRoom: msg.idRoom });
                 if (!sourceChat) {
                         const initChat = [msg.message];
@@ -90,15 +102,14 @@ io.on("connection", (socket) => {
         // A user was offline 
         socket.on('disconnect', async (data) => {
                 const index = listUserOnline.findIndex(user => user.socket.id === socket.id);
-                const user = listUserOnline[index];
-                await Presence.findOneAndUpdate({ userID: user.userID }, {
+                const id = listUserOnline[index].userID;
+                await Presence.findOneAndUpdate({ userID: id }, {
                         $set: {
                                 presence: false,
                         }
                 });
                 listUserOnline.splice(index, 1);
                 io.emit('updatePresence', 'updatePresence');
-
         });
 
         // Update list online user

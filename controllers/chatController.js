@@ -1,14 +1,14 @@
 const User = require('../models/User');
 const BaseResponse = require('../models/BaseResponse');
 const Errors = require('../models/Errors');
-const Chat = require('../models/Chat');
+const Room = require('../models/Room');
 const Presence = require('../models/Presence');
 
 // send rooms data to user
-exports.joinApp = async (req, res) => {// "userID": "...."
+exports.getRooms = async (req, res) => {
     try {
         let chatRooms = [];
-        const rooms = await Chat.find({ users: { $in: [req.body.userID] } });
+        const rooms = await Room.find({ users: { $in: [req.body.userID] } });
 
         for (const element of rooms) {
             let objectRoom = {};
@@ -35,7 +35,7 @@ exports.joinApp = async (req, res) => {// "userID": "...."
             chatRooms,
             new Errors(
                 200,
-                "Create chat room Successfully!",
+                "Successfully!",
             )
         ));
     } catch (error) {
@@ -56,7 +56,7 @@ exports.joinApp = async (req, res) => {// "userID": "...."
 
 exports.createRoom = async (req, res) => {
     try {
-        const newChatRom = new Chat({
+        const newChatRom = new Room({
             users: req.body.users,
             lastMessage: req.body.message,
             typeLastMessage: req.body.type,

@@ -3,8 +3,6 @@ const router = require('express').Router();
 const authController = require('../controllers/authController');
 
 router.post("/presence", authController.getPresence);
-
-router.post("/createRoom",authController.createRoom);
 //Register
 router.post("/register",authController.register);
 //Login

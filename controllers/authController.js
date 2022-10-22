@@ -5,7 +5,6 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const BaseResponse = require('../models/BaseResponse');
 const Errors = require('../models/Errors');
-const Chat = require('../models/Chat');
 
 exports.logout = async (req, res) => {
         try {
@@ -251,40 +250,6 @@ exports.login = async (req, res) => {
                                 500,
                                 err.toString(),
                         )
-                ));
-        }
-}
-
-exports.createRoom = async (req, res) => {
-        try {
-                const newChatRom = new Chat({
-                        users: req.body.users,
-                        lastMessage: req.body.message,
-                        typeLastMessage: req.body.type,
-                        timeLastMessage: req.body.time,
-                });
-                await newChatRom.save();
-                return res.status(200).json(new BaseResponse(
-                        1,
-                        Date.now(),
-                        [],
-                        new Errors(
-                                200,
-                                "Create chat room Successfully!",
-                        )
-                ));
-        } catch (error) {
-                console.log(error.toString());
-                return res.status(500).json(new BaseResponse(
-                        -1,
-                        Date.now(),
-                        []
-                        ,
-                        new Errors(
-                                500,
-                                error.toString(),
-                        )
-
                 ));
         }
 }
