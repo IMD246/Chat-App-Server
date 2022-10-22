@@ -7,7 +7,6 @@ const BaseResponse = require('../models/BaseResponse');
 const Errors = require('../models/Errors');
 const Chat = require('../models/Chat');
 
-
 exports.logout = async (req, res) => {
         try {
                 const user = await User.findById(req.body.userID);

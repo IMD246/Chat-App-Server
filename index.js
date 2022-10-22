@@ -3,15 +3,13 @@ const app = express();
 const http = require("http");
 const server = http.createServer(app);
 const dotenv = require("dotenv");
-const port = process.env.PORT;
-// const port = 5000;
+// const port = process.env.PORT;
+const port = 5000;
 const mongoose = require("mongoose");
 const authRouter = require("./routes/auth");
 const chatRouter = require("./routes/chat");
 const userRouter = require("./routes/user");
 const UserJoinApp = require("./models/UserJoinApp");
-const Message = require("./models/Message");
-const Chat = require('./models/Chat');
 dotenv.config();
 
 const { Server } = require("socket.io");
@@ -117,12 +115,3 @@ app.use("/api/user", userRouter);
 server.listen(port, () => {
         console.log(`listening on: *${port}`);
 });
-
-
-// io.on('connection', function(socket) {
-//       socket.on('disconnect', (data) => {
-//             console.log('Got disconnect! ');
-//             console.log('ID: '+ socket.id);
-//       });
-//    socket.on('updateUserPresence', (data)=>console.log('data: '+data));
-// });
