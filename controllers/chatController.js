@@ -3,6 +3,87 @@ const BaseResponse = require('../models/BaseResponse');
 const Errors = require('../models/Errors');
 const Room = require('../models/Room');
 const Presence = require('../models/Presence');
+const Friends = require('../models/Friend');
+
+// get friend requests
+exports.getFriendRequests = async (req, res) => {
+    try {
+        const friends = await Friends.findOne({ userID: req.body.userID });
+        let friendRequests = [];
+        if (!friends) {
+            return res.status(400).json(new BaseResponse(
+                -1,
+                Date.now(),
+                [],
+                new Errors(
+                    400,
+                    "Not found",
+                ))
+            );
+        }
+        for (const element of friends.requests) {
+            let request = {};
+            let user = await User.findOne({ _id: element['userID']});
+            request['user'] = user;
+            request['time'] = element['time'];
+            friendRequests.push(request);
+        }
+        return res.status(200).json(new BaseResponse(
+            1,
+            Date.now(),
+            friendRequests,
+            new Errors(
+                200,
+                "Successfully!",
+            )
+        ));
+    } catch (error) {
+        console.log(error.toString());
+        return res.status(500).json(new BaseResponse(
+            -1,
+            Date.now(),
+            []
+            ,
+            new Errors(
+                500,
+                error.toString(),
+            )
+
+        ));
+    }
+}
+// get friend requests
+exports.createFriend = async (req, res) => {
+    try {
+        const friends = new Friends({
+            userID: req.body.userID,
+        });
+        await friends.save();
+
+        return res.status(200).json(new BaseResponse(
+            1,
+            Date.now(),
+            [],
+            new Errors(
+                200,
+                "Successfully!",
+            )
+        ));
+    } catch (error) {
+        console.log(error.toString());
+        return res.status(500).json(new BaseResponse(
+            -1,
+            Date.now(),
+            []
+            ,
+            new Errors(
+                500,
+                error.toString(),
+            )
+
+        ));
+    }
+}
 
 // send rooms data to user
 exports.getRooms = async (req, res) => {

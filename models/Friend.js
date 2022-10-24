@@ -10,11 +10,11 @@ const FriendsSchema = new mongoose.Schema({
         type: Array,
         default: [],
     },
-    request: {
+    requests: {
         type: Array,
         default: [],
     },
-    ban: {
+    bans: {
         type: Array,
         default: [],
     },

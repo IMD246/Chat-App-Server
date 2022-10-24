@@ -3,8 +3,8 @@ const app = express();
 const http = require("http");
 const server = http.createServer(app);
 const dotenv = require("dotenv");
-const port = process.env.PORT;
-// const port = 5000;
+// const port = process.env.PORT;
+const port = 5000;
 const mongoose = require("mongoose");
 const authRouter = require("./routes/auth");
 const chatRouter = require("./routes/chat");
@@ -16,6 +16,8 @@ const { Server } = require("socket.io");
 const Presence = require("./models/Presence");
 const SourceChat = require("./models/SourceChat");
 const Room = require("./models/Room");
+const User = require("./models/User");
+const Friend = require("./models/Friend");
 app.use(express.json());
 
 mongoose.connect(process.env.MONGO_URL, {
@@ -90,24 +92,64 @@ io.on("connection", (socket) => {
                 }
                 socket.emit("getSourceChat", sourceChatDoc);
         });
-
-        socket.on("addFriendRequest", async (listUserID) => {
+        // Add a new friend request
+        socket.on("addFriendRequest", async (data) => {
                 // find socket
-                let index = listUserOnline.findIndex(user => user.userID === listUserID.friendID);
-                if (index == null) return;
-
-                // update request
-                let requests = [];
-                let friendRequests = await Friends.findOne({ userID: listUserID.friendID });
-                friendRequests.request.push(listUserID.userID);
-                for (const element of friendRequests.request) {
-                        let user = await User.findOne({ _id: element });
-                        requests.push(user);
+                let index = listUserOnline.findIndex(user => user.userID === data.friendID);
+                if (!index) {
+                        // send request
+                        let user = await User.findOne({ _id: data.userID });
+                        let objectRequest = {
+                                "user": user,
+                                "time": data.time,
+                        };
+                        listUserOnline[index].socket.emit("friendRequest", objectRequest);
                 }
-                listUserOnline[index].socket.emit("friendRequest", requests);
-                await friendRequests.save();
-        });
 
+                // Update list friend requests
+                let friendRequests = await Friend.findOne({ userID: data.friendID });
+                if (!friendRequests) {
+                        // initialized
+                        const newFriend = new Friend({
+                                userID: data.friendID,
+                                requests: [{
+                                        "userID": data.userID,
+                                        "time": data.time,
+                                }]
+                        });
+                        await newFriend.save();
+                } else {
+                        // update
+                        friendRequests.requests.push({
+                                "userID": data.userID,
+                                "time": data.time,
+                        });
+                        await friendRequests.save();
+                }
+
+        });
+        // Accept a friend request
+        socket.on("acceptFriendRequest", async data => {
+                // find friend socket
+                let num = listUserOnline.findIndex(user => user.userID === data.friendID);
+                if(!num){
+                        //TODO: Làm chưa tới
+                        listUserOnline[num].socket.emit("updateFriends", null);
+                }
+
+                // get the friend tables
+                let acceptFriendTable = await Friend.findOne({ userID: data.userID });
+                let requestFriendTable = await Friend.findOne({ userID: data.friendID });
+                // add to friend
+                acceptFriendTable.friends.push(data.friendID);
+                requestFriendTable.friends.push(data.userID);
+                // remove the request
+                let index = acceptFriendTable.requests.findIndex(
+                        req => req['userID'] === data.friendID
+                );
+                acceptFriendTable.requests.splice(index, 1);
+                await acceptFriendTable.save();
+        });
         // A user was offline 
         socket.on('disconnect', async (data) => {
                 const index = listUserOnline.findIndex(user => user.socket.id === socket.id);
@@ -117,6 +159,7 @@ io.on("connection", (socket) => {
                                 presence: false,
                         }
                 });
+                console.log("disconnect " + socket.id);
                 listUserOnline.splice(index, 1);
                 io.emit('updatePresence', 'updatePresence');
         });
