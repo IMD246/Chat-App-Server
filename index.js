@@ -3,8 +3,8 @@ const app = express();
 const http = require("http");
 const server = http.createServer(app);
 const dotenv = require("dotenv");
-// const port = process.env.PORT;
-const port = 5000;
+const port = process.env.PORT;
+// const port = 5000;
 const mongoose = require("mongoose");
 const authRouter = require("./routes/auth");
 const chatRouter = require("./routes/chat");
@@ -53,33 +53,42 @@ io.on("connection", (socket) => {
                 );
                 const room = await Room.findOne({ _id: msg.idRoom });
                 socket.emit("getRooms", room);
-                let sourceChat = await SourceChat.findOne({ idRoom: msg.idRoom });
-                if (!sourceChat) {
+                let sourceChatDoc = await SourceChat.findOne({ idRoom: msg.idRoom });
+                if (!sourceChatDoc) {
                         const initChat = [msg.message];
+                        let objectTime = {};
+                        objectTime[msg.message.time] = [initChat];
                         await new SourceChat({
                                 idRoom: msg.idRoom,
-                                sourceChat: [initChat],
+                                sourceChat: objectTime,
                         }).save();
-                        sourceChat = await SourceChat.findOne({ idRoom: msg.idRoom });
+                        sourceChatDoc = await SourceChat.findOne({ idRoom: msg.idRoom });
                 } else {
-                        let lastMsg = sourceChat.sourceChat.at(-1);
-                        const idSenderOfLastMsg = lastMsg[0].idSender;
-                        idSenderOfLastMsg === msg.idUser
-                                ? sourceChat.sourceChat.at(-1).push(msg.message)
-                                : sourceChat.sourceChat.push(msg.message);
+                        let sourceChat = sourceChatDoc.sourceChat;
+                        let lastTime = Object.keys(sourceChat).at(-1).split(" ")[1];
+                        let newTime = msg.message.time.split(" ")[1];
+                        if (lastTime < newTime) {
+                                sourceChat[msg.message.time] = [msg.message];
+                        } else {
+                                let lastUser = sourceChat[Object.keys(sourceChat).at(-1)].at(-1);
+                                const idSenderOfLastMsg = lastUser[0].idSender;
+                                idSenderOfLastMsg === msg.idUser
+                                        ? sourceChat[Object.keys(sourceChat).at(-1)].at(-1).push(msg.message)
+                                        : sourceChat[Object.keys(sourceChat).at(-1)].push([msg.message]);
+                        }
 
                         await SourceChat.updateOne({ idRoom: msg.idRoom }, {
                                 $set: {
-                                        sourceChat: sourceChat.sourceChat,
+                                        sourceChat: sourceChat,
                                 }
                         });
                 }
 
                 let mess = listUserOnline.findIndex(user => user.userID === msg.idTarget);
                 if (mess != -1) {
-                        listUserOnline[mess].socket.emit("getSourceChat", sourceChat);
+                        listUserOnline[mess].socket.emit("getSourceChat", sourceChatDoc);
                 }
-                socket.emit("getSourceChat", sourceChat);
+                socket.emit("getSourceChat", sourceChatDoc);
         });
 
         socket.on("addFriendRequest", async (listUserID) => {

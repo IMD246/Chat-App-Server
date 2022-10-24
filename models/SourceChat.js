@@ -7,7 +7,7 @@ const SourceChatsSchema = new mongoose.Schema({
         unique: true,
     },
     sourceChat: {
-        type: Array,
+        type: Object,
         required: true,
     },
 }, { timestamps: true }
