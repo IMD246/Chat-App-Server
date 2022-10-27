@@ -4,6 +4,59 @@ const Errors = require('../models/Errors');
 const Room = require('../models/Room');
 const Presence = require('../models/Presence');
 const Friends = require('../models/Friend');
+const Friend = require('../models/Friend');
+
+exports.removeRequest = async (req, res) => {
+    try {
+        const friends = await Friends.findOne({ userID: req.body.userID });
+        let friendRequests = [];
+        if (!friends) {
+            return res.status(400).json(new BaseResponse(
+                -1,
+                Date.now(),
+                [],
+                new Errors(
+                    400,
+                    "Not found",
+                ))
+            );
+        }
+        for (let i = 0; i < friends.requests.length; i++) {
+            if (friends.requests[i]['userID'] === req.body.friendID) {
+                friends.requests.splice(i, 1);
+            } else {
+                let request = {};
+                let user = await User.findOne({ _id: friends.requests[i]['userID'] });
+                request['user'] = user;
+                request['time'] = friends.requests[i]['time'];
+                friendRequests.push(request);
+            }
+        }
+        await friends.save();
+        return res.status(200).json(new BaseResponse(
+            1,
+            Date.now(),
+            friendRequests,
+            new Errors(
+                200,
+                "Successfully!",
+            )
+        ));
+    } catch (error) {
+        console.log(error.toString());
+        return res.status(500).json(new BaseResponse(
+            -1,
+            Date.now(),
+            []
+            ,
+            new Errors(
+                500,
+                error.toString(),
+            )
+
+        ));
+    }
+}
 
 // get friend requests
 exports.getFriendRequests = async (req, res) => {
@@ -23,7 +76,7 @@ exports.getFriendRequests = async (req, res) => {
         }
         for (const element of friends.requests) {
             let request = {};
-            let user = await User.findOne({ _id: element['userID']});
+            let user = await User.findOne({ _id: element['userID'] });
             request['user'] = user;
             request['time'] = element['time'];
             friendRequests.push(request);
@@ -169,8 +222,12 @@ exports.createRoom = async (req, res) => {
     }
 }
 
+/*
+    request: userID, emailFriend
+*/
 exports.findAUser = async (req, res) => {
     try {
+        // Kiểm tra useID có tồn tại trong list request Friend
         const user = await User.findOne({ email: req.body.email });
         if (!user) {
             return res.status(400).json(new BaseResponse(
@@ -178,6 +235,32 @@ exports.findAUser = async (req, res) => {
                 Date.now(),
                 user,
                 new Errors(400, "Not found")
+            ));
+        }
+
+        const friend = await Friend.findOne({ userID: user._id });
+        if (!friend) {
+            return res.status(200).json(new BaseResponse(
+                1,
+                Date.now(),
+                user,
+                new Errors(
+                    200,
+                    "Successfully!",
+                )
+            ));
+        }
+        
+        const result = friend.requests.filter( request => request['userID'] == req.body.userID);
+        if(result){
+            return res.status(200).json(new BaseResponse(
+                -1,
+                Date.now(),
+                user,
+                new Errors(
+                    200,
+                    "Duplicated!",
+                )
             ));
         }
         return res.status(200).json(new BaseResponse(

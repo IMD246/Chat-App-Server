@@ -5,6 +5,8 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const BaseResponse = require('../models/BaseResponse');
 const Errors = require('../models/Errors');
+const Room = require('../models/Room');
+const Friend = require('../models/Friend');
 
 exports.logout = async (req, res) => {
         try {
@@ -59,44 +61,10 @@ exports.loginByToken = async (req, res) => {
         try {
                 const authorization = req.headers.authorization;
                 const str = authorization.split(" ")[1];
+
                 const checkAccessToken = await AccessToken.findOne({ accessToken: str });
-                if (checkAccessToken != null) {
-                        const user = await User.findById(checkAccessToken.userID);
-                        const updatePresence = await Presence.findOneAndUpdate({ userID: user.id }, {
-                                $set: {
-                                        presence: true,
-                                }
-                        });
-                        const userPresence = await Presence.findById(updatePresence);
-                        if (user != null) {
-                                return res.status(200).json(
-                                        new BaseResponse(
-                                                1,
-                                                Date.now(),
-                                                [
-                                                        { accessToken: checkAccessToken, user: user, userPresence: userPresence }
-                                                ],
-                                                new Errors(
-                                                        200,
-                                                        "",
-                                                )
-                                        ));
-                        }
-                        else {
-                                return res.status(401).json(
-                                        new BaseResponse(
-                                                -1,
-                                                Date.now(),
-                                                [],
-                                                new Errors(
-                                                        401,
-                                                        "You are not authenticated",
-                                                )
-                                        ));
-                        }
-                }
-                else {
-                        res.status(404).json(
+                if (!checkAccessToken) {
+                        return res.status(404).json(
                                 new BaseResponse(
                                         -1,
                                         Date.now(),
@@ -106,7 +74,84 @@ exports.loginByToken = async (req, res) => {
                                                 "Token is invalid",
                                         )
                                 ));
+
                 }
+
+                const user = await User.findById(checkAccessToken.userID);
+                if (!user) {
+                        return res.status(401).json(
+                                new BaseResponse(
+                                        -1,
+                                        Date.now(),
+                                        [],
+                                        new Errors(
+                                                401,
+                                                "You are not authenticated",
+                                        )
+                                ));
+                }
+
+                const updatePresence = await Presence.findOneAndUpdate({ userID: user.id }, {
+                        $set: {
+                                presence: true,
+                        }
+                });
+                const userPresence = await Presence.findById(updatePresence);
+
+                // Get necessary all data for client: 
+                // 1. Rooms
+                let chatRooms = [];
+                const rooms = await Room.find({ users: { $in: [user.id] } });
+
+                for (const element of rooms) {
+                        let objectRoom = {};
+
+                        // room information
+                        objectRoom['room'] = element;
+
+                        // friend information
+                        let listID = element.users;
+                        let roomfriendID = user.id === listID[0] ? listID[1] : listID[0];
+                        const roomFriend = await User.findOne({ _id: roomfriendID });
+                        objectRoom['user'] = roomFriend;
+
+                        // presence
+                        const presence = await Presence.findOne({ userID: roomfriendID });
+                        objectRoom['presence'] = presence;
+
+                        chatRooms.push(objectRoom);
+                }
+
+                // 2. Friend requests
+                const friend = await Friend.findOne({ userID: user.id });
+                let friendRequests = [];
+                if (friend) {
+                        for (const element of friend.requests) {
+                                let request = {};
+                                request['user'] = await User.findOne({ _id: element['userID'] });
+                                request['time'] = element['time'];
+                                friendRequests.push(request);
+                        }
+                }
+
+                return res.status(200).json(
+                        new BaseResponse(
+                                1,
+                                Date.now(),
+                                [
+                                        {
+                                                accessToken: checkAccessToken,
+                                                user: user,
+                                                userPresence: userPresence,
+                                                chatRooms: chatRooms,
+                                                friendRequests: friendRequests,
+                                        }
+                                ],
+                                new Errors(
+                                        200,
+                                        "",
+                                )
+                        ));
 
         } catch (err) {
                 return res.status(500).json(
@@ -178,6 +223,7 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
         try {
+                // Check email
                 const user = await User.findOne({ email: req.body.email });
                 if (!user) {
                         return res.status(400).json(
@@ -191,6 +237,8 @@ exports.login = async (req, res) => {
                                         )
                                 ));
                 }
+
+                // Check password
                 const validate = await bcrypt.compare(req.body.password, user.password);
                 if (!validate) {
                         return res.status(400).json(new BaseResponse(
@@ -207,33 +255,78 @@ exports.login = async (req, res) => {
                 // Generate an access token
                 var accessToken = jwt.sign({ id: user.id }, "mySecrectKey");
 
-                var checkAccess = await AccessToken.findOne({
+                var checkAccessToken = await AccessToken.findOne({
                         userID: user.id
                 })
-                if (checkAccess != null) {
-                        accessToken = checkAccess.accessToken;
-                }
-                else {
+
+                if (checkAccessToken != null) {
+                        accessToken = checkAccessToken.accessToken;
+                } else {
                         const access = new AccessToken({
                                 accessToken: accessToken,
                                 userID: user.id
                         }
                         );
                         await access.save();
-                        checkAccess = access;
+                        checkAccessToken = access;
                 }
+
+                // Update presence of the user
                 const updatePresence = await Presence.findOneAndUpdate({ userID: user.id }, {
                         $set: {
                                 presence: true,
                         }
                 });
                 const userPresence = await Presence.findById(updatePresence);
+
+                // Get necessary all data for client: 
+                // 1. Rooms
+                let chatRooms = [];
+                const rooms = await Room.find({ users: { $in: [user.id] } });
+
+                for (const element of rooms) {
+                        let objectRoom = {};
+
+                        // room information
+                        objectRoom['room'] = element;
+
+                        // friend information
+                        let listID = element.users;
+                        let roomfriendID = user.id === listID[0] ? listID[1] : listID[0];
+                        const roomFriend = await User.findOne({ _id: roomfriendID });
+                        objectRoom['user'] = roomFriend;
+
+                        // presence
+                        const presence = await Presence.findOne({ userID: roomfriendID });
+                        objectRoom['presence'] = presence;
+
+                        chatRooms.push(objectRoom);
+                }
+
+                // 2. Friend requests
+                const friend = await Friend.findOne({ userID: user.id });
+                let friendRequests = [];
+                if (friend) {
+                        for (const element of friend.requests) {
+                                let request = {};
+                                request['user'] = await User.findOne({ _id: element['userID'] });
+                                request['time'] = element['time'];
+                                friendRequests.push(request);
+                        }
+                }
+
                 return res.status(200).json(
                         new BaseResponse(
                                 1,
                                 Date.now(),
                                 [
-                                        { accessToken: checkAccess, user: user, userPresence: userPresence }
+                                        {
+                                                accessToken: checkAccessToken,
+                                                user: user,
+                                                userPresence: userPresence,
+                                                chatRooms: chatRooms,
+                                                friendRequests: friendRequests,
+                                        }
                                 ],
                                 new Errors(
                                         200,

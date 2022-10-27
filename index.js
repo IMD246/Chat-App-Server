@@ -29,12 +29,12 @@ mongoose.connect(process.env.MONGO_URL, {
 // SocketIO
 const io = new Server(server);
 
-var listUserOnline = [];
+var listOnlineUser = [];
 io.on("connection", (socket) => {
         // Join app
         socket.on("joinApp", async userID => {
                 console.log("join app " + socket.id);
-                listUserOnline.push(new UserJoinApp(socket, userID));
+                listOnlineUser.push(new UserJoinApp(socket, userID));
         });
         // Get source chat by roomID
         socket.on('getSourceChat', async data => {
@@ -43,6 +43,8 @@ io.on("connection", (socket) => {
         });
         // Recevie a message      
         socket.on("message", async (msg) => {
+                msg.message.state = 'sended';
+                // update last message for room
                 await Room.findOneAndUpdate(
                         { _id: msg.idRoom },
                         {
@@ -55,6 +57,8 @@ io.on("connection", (socket) => {
                 );
                 const room = await Room.findOne({ _id: msg.idRoom });
                 socket.emit("getRooms", room);
+                
+                // update source chat
                 let sourceChatDoc = await SourceChat.findOne({ idRoom: msg.idRoom });
                 if (!sourceChatDoc) {
                         const initChat = [msg.message];
@@ -70,7 +74,7 @@ io.on("connection", (socket) => {
                         let lastTime = Object.keys(sourceChat).at(-1).split(" ")[1];
                         let newTime = msg.message.time.split(" ")[1];
                         if (lastTime < newTime) {
-                                sourceChat[msg.message.time] = [msg.message];
+                                sourceChat[msg.message.time] = [[msg.message]];
                         } else {
                                 let lastUser = sourceChat[Object.keys(sourceChat).at(-1)].at(-1);
                                 const idSenderOfLastMsg = lastUser[0].idSender;
@@ -86,16 +90,16 @@ io.on("connection", (socket) => {
                         });
                 }
 
-                let mess = listUserOnline.findIndex(user => user.userID === msg.idTarget);
+                let mess = listOnlineUser.findIndex(user => user.userID === msg.idTarget);
                 if (mess != -1) {
-                        listUserOnline[mess].socket.emit("getSourceChat", sourceChatDoc);
+                        listOnlineUser[mess].socket.emit("getSourceChat", sourceChatDoc);
                 }
                 socket.emit("getSourceChat", sourceChatDoc);
         });
         // Add a new friend request
         socket.on("addFriendRequest", async (data) => {
                 // find socket
-                let index = listUserOnline.findIndex(user => user.userID === data.friendID);
+                let index = listOnlineUser.findIndex(user => user.userID === data.friendID);
                 if (!index) {
                         // send request
                         let user = await User.findOne({ _id: data.userID });
@@ -103,7 +107,8 @@ io.on("connection", (socket) => {
                                 "user": user,
                                 "time": data.time,
                         };
-                        listUserOnline[index].socket.emit("friendRequest", objectRequest);
+                        console.log(`add request: index = ${index}, socket = ${listOnlineUser[index].socket.id}`);
+                        listOnlineUser[index].socket.emit("friendRequest", objectRequest);
                 }
 
                 // Update list friend requests
@@ -126,20 +131,26 @@ io.on("connection", (socket) => {
                         });
                         await friendRequests.save();
                 }
-
+                socket.emit('addFriendRequestSuccess', true);
         });
         // Accept a friend request
         socket.on("acceptFriendRequest", async data => {
                 // find friend socket
-                let num = listUserOnline.findIndex(user => user.userID === data.friendID);
+                let num = listOnlineUser.findIndex(user => user.userID === data.friendID);
                 if(!num){
                         //TODO: Làm chưa tới
-                        listUserOnline[num].socket.emit("updateFriends", null);
+                        listOnlineUser[num].socket.emit("updateFriends", null);
                 }
 
                 // get the friend tables
-                let acceptFriendTable = await Friend.findOne({ userID: data.userID });
+                let acceptFriendTable = await Friend.findOne({ userID: data.userID }); // chac chan khac null
                 let requestFriendTable = await Friend.findOne({ userID: data.friendID });
+                if(!requestFriendTable){
+                        await new Friend({
+                                userID: data.friendID
+                        }).save();
+                        requestFriendTable = await Friend.findOne({ userID: data.friendID });
+                }
                 // add to friend
                 acceptFriendTable.friends.push(data.friendID);
                 requestFriendTable.friends.push(data.userID);
@@ -149,18 +160,19 @@ io.on("connection", (socket) => {
                 );
                 acceptFriendTable.requests.splice(index, 1);
                 await acceptFriendTable.save();
+                await requestFriendTable.save();
         });
         // A user was offline 
         socket.on('disconnect', async (data) => {
-                const index = listUserOnline.findIndex(user => user.socket.id === socket.id);
-                const id = listUserOnline[index].userID;
+                const index = listOnlineUser.findIndex(user => user.socket.id === socket.id);
+                const id = listOnlineUser[index].userID;
                 await Presence.findOneAndUpdate({ userID: id }, {
                         $set: {
                                 presence: false,
                         }
                 });
                 console.log("disconnect " + socket.id);
-                listUserOnline.splice(index, 1);
+                listOnlineUser.splice(index, 1);
                 io.emit('updatePresence', 'updatePresence');
         });
 
