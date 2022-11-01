@@ -1,23 +1,19 @@
 const mongoose = require('mongoose');
 
-const ChatSchema = new mongoose.Schema({
+const RoomSchema = new mongoose.Schema({
         users: {
                 type: Array,
                 required: true,
         },
         lastMessage: {
-                type: String,
+                type: Object,
                 required: true,
         },
-        typeLastMessage:{
-                type: String,
-                default: 'text',  
-        },
-        timeLastMessage:{
-                type: String,
-                required: true, 
+        state: {
+                type: Number,
+                required: true,
         }
 }, { timestamps: true }
 );
 
-module.exports = mongoose.model("rooms", ChatSchema);
+module.exports = mongoose.model("rooms", RoomSchema);

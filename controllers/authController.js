@@ -122,15 +122,22 @@ exports.loginByToken = async (req, res) => {
                         chatRooms.push(objectRoom);
                 }
 
-                // 2. Friend requests
+                // 2. Friend requests & list friend
                 const friend = await Friend.findOne({ userID: user.id });
                 let friendRequests = [];
+                let listFriend = [];
+
                 if (friend) {
                         for (const element of friend.requests) {
                                 let request = {};
                                 request['user'] = await User.findOne({ _id: element['userID'] });
                                 request['time'] = element['time'];
                                 friendRequests.push(request);
+                        }
+
+                        for (const element of friend.friends) {
+                                let fr = await User.findOne({ _id: element });
+                                listFriend.push(fr);
                         }
                 }
 
@@ -145,6 +152,7 @@ exports.loginByToken = async (req, res) => {
                                                 userPresence: userPresence,
                                                 chatRooms: chatRooms,
                                                 friendRequests: friendRequests,
+                                                listFriend: listFriend,
                                         }
                                 ],
                                 new Errors(
@@ -303,15 +311,22 @@ exports.login = async (req, res) => {
                         chatRooms.push(objectRoom);
                 }
 
-                // 2. Friend requests
+                // 2. Friend requests & list friend
                 const friend = await Friend.findOne({ userID: user.id });
                 let friendRequests = [];
+                let listFriend = [];
+
                 if (friend) {
                         for (const element of friend.requests) {
                                 let request = {};
                                 request['user'] = await User.findOne({ _id: element['userID'] });
                                 request['time'] = element['time'];
                                 friendRequests.push(request);
+                        }
+
+                        for (const element of friend.friends) {
+                                let fr = await User.findOne({ _id: element });
+                                listFriend.push(fr);
                         }
                 }
 
@@ -326,6 +341,7 @@ exports.login = async (req, res) => {
                                                 userPresence: userPresence,
                                                 chatRooms: chatRooms,
                                                 friendRequests: friendRequests,
+                                                listFriend: listFriend,
                                         }
                                 ],
                                 new Errors(

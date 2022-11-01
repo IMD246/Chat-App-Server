@@ -6,6 +6,7 @@ const Presence = require('../models/Presence');
 const Friends = require('../models/Friend');
 const Friend = require('../models/Friend');
 
+// remove a friend request
 exports.removeRequest = async (req, res) => {
     try {
         const friends = await Friends.findOne({ userID: req.body.userID });
@@ -193,8 +194,7 @@ exports.createRoom = async (req, res) => {
         const newChatRom = new Room({
             users: req.body.users,
             lastMessage: req.body.message,
-            typeLastMessage: req.body.type,
-            timeLastMessage: req.body.time,
+            state: 1,
         });
         await newChatRom.save();
         return res.status(200).json(new BaseResponse(
@@ -227,7 +227,6 @@ exports.createRoom = async (req, res) => {
 */
 exports.findAUser = async (req, res) => {
     try {
-        // Kiểm tra useID có tồn tại trong list request Friend
         const user = await User.findOne({ email: req.body.email });
         if (!user) {
             return res.status(400).json(new BaseResponse(
@@ -238,7 +237,7 @@ exports.findAUser = async (req, res) => {
             ));
         }
 
-        const friend = await Friend.findOne({ userID: user._id });
+        const friend = await Friend.findOne({ userID: user.id });
         if (!friend) {
             return res.status(200).json(new BaseResponse(
                 1,
@@ -250,9 +249,10 @@ exports.findAUser = async (req, res) => {
                 )
             ));
         }
-        
-        const result = friend.requests.filter( request => request['userID'] == req.body.userID);
-        if(result){
+
+        let result = friend.requests.findIndex(request => request['userID'] == req.body.userID);
+        if (!result) {
+            console.log("result: "+result);
             return res.status(200).json(new BaseResponse(
                 -1,
                 Date.now(),
