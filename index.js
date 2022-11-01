@@ -278,6 +278,9 @@ app.post("/upload", upload.single('avatar'), (req, res) => {
                 return res.json({ error: e });
         }
 });
+app.get("/", (req, res) => {
+        res.send("Its working !");
+});
 server.listen(port, () => {
         console.log(`listening on: *${port}`);
 });
