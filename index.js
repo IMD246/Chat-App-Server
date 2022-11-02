@@ -3,8 +3,8 @@ const app = express();
 const http = require("http");
 const server = http.createServer(app);
 const dotenv = require("dotenv");
-const port = process.env.PORT;
-// const port = 5000;
+// const port = process.env.PORT;
+const port = 5000;
 const mongoose = require("mongoose");
 const authRouter = require("./routes/auth");
 const chatRouter = require("./routes/chat");
@@ -64,63 +64,23 @@ io.on("connection", (socket) => {
 
         // Recevie a message
         socket.on("message", async (msg) => {
-                console.log("mess: "+msg.message.content);
                 msg.message.state = "sended"; // change msg state from loading to sended
-                var mess = listOnlineUser.findIndex((user) => user.userID === msg.idTarget);
+                let mess = listOnlineUser.findIndex((user) => user.userID === msg.idTarget);
 
-                // update last message for room
                 let room;
                 let friend;
                 let presence;
                 if (!msg.idRoom) { // room does not exist 
-                        let lastMsg = msg.message;
-                        if (msg.subMsg) lastMsg.content = msg.subMsg;
                         room = new Room({
                                 users: [msg.idUser, msg.idTarget],
                                 lastMessage: lastMsg,
                                 state: 1
                         });
                         await room.save();
-                        friend = await User.findOne({ _id: msg.idTarget });
-                        presence = await Presence.findOne({ userID: msg.idTarget });
-                        // Send room data for clients
-                        socket.emit("getRooms", {
-                                room: room,
-                                user: friend,
-                                presence: presence
-                        });
-                        if (mess != -1) {
-                                friend = await User.findOne({ _id: msg.idUser });
-                                presence = await Presence.findOne({ userID: msg.idUser });
-                                listOnlineUser[mess].socket.emit("getRooms", {
-                                        room: room,
-                                        user: friend,
-                                        presence: presence
-                                });
-                        }
                         socket.join(room.id); // create socket room
                 } else {
-                        // let lastMsg = msg.message;
-                        // if (msg.subMsg) lastMsg.content = msg.subMsg;
                         room = await Room.findOne({ _id: msg.idRoom });
-                        let oldState = room.state;
-                        await Room.findOneAndUpdate(
-                                { _id: msg.idRoom },
-                                {
-                                        $set: {
-                                                lastMessage: msg.message,
-                                                state: oldState + 1
-                                        }
-                                }
-                        );
-                        room = await Room.findOne({ _id: msg.idRoom });
-                        // Send room data for clients
-                        socket.emit("getRooms", {
-                                room: room,
-                        });
-                        if (mess != -1) {
-                                listOnlineUser[mess].socket.emit("getRooms", { room: room, });
-                        }
+                        room.state = room.state + 1;
                 }
 
                 // update source chat
@@ -155,8 +115,44 @@ io.on("connection", (socket) => {
                                 }
                         );
                 }
-                console.log(sourceChatDoc.sourceChat);
                 io.to(room.id).emit("getSourceChat", sourceChatDoc);
+
+                // update last message
+                if (msg.subMsg) msg.message.content = msg.subMsg;
+                await Room.findOneAndUpdate(
+                        { _id: room.id },
+                        {
+                                $set: {
+                                        lastMessage: msg.message,
+                                        state: room.state
+                                }
+                        }
+                );
+                // Send room data for clients
+                if (!msg.idRoom) {
+                        friend = await User.findOne({ _id: msg.idTarget });
+                        presence = await Presence.findOne({ userID: msg.idTarget });
+                        socket.emit("getRooms", {
+                                room: room,
+                                user: friend,
+                                presence: presence
+                        });
+                        if (mess != -1) {
+                                friend = await User.findOne({ _id: msg.idUser });
+                                presence = await Presence.findOne({ userID: msg.idUser });
+                                listOnlineUser[mess].socket.emit("getRooms", {
+                                        room: room,
+                                        user: friend,
+                                        presence: presence
+                                });
+                        }
+
+                } else {
+                        socket.emit("getRooms", { room: room });
+                        if (mess != -1) {
+                                listOnlineUser[mess].socket.emit("getRooms", { room: room });
+                        }
+                }
         });
 
         // Add a new friend request
