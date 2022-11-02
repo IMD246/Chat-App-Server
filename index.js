@@ -64,6 +64,7 @@ io.on("connection", (socket) => {
 
         // Recevie a message
         socket.on("message", async (msg) => {
+                console.log("mess: "+msg.message.content);
                 msg.message.state = "sended"; // change msg state from loading to sended
                 var mess = listOnlineUser.findIndex((user) => user.userID === msg.idTarget);
 
@@ -154,7 +155,7 @@ io.on("connection", (socket) => {
                                 }
                         );
                 }
-
+                console.log(sourceChatDoc.sourceChat);
                 io.to(room.id).emit("getSourceChat", sourceChatDoc);
         });
 
