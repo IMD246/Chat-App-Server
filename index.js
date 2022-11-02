@@ -3,21 +3,19 @@ const app = express();
 const http = require("http");
 const server = http.createServer(app);
 const dotenv = require("dotenv");
-const port = process.env.PORT;
-// const port = 5000;
+// const port = process.env.PORT;
+const port = 5000;
 const mongoose = require("mongoose");
 const authRouter = require("./routes/auth");
 const chatRouter = require("./routes/chat");
 const userRouter = require("./routes/user");
 const UserJoinApp = require("./models/UserJoinApp");
 const { Server } = require("socket.io");
-const multer = require("multer");
 const Presence = require("./models/Presence");
 const SourceChat = require("./models/SourceChat");
 const Room = require("./models/Room");
 const User = require("./models/User");
 const Friend = require("./models/Friend");
-const path = require("path");
 
 dotenv.config();
 app.use(express.json());
@@ -26,14 +24,6 @@ mongoose.connect(process.env.MONGO_URL, {
         useNewUrlParser: true,
         useUnifiedTopology: true,
 }).then(console.log("connected to MongGoDB")).catch((error) => console.log(error));
-
-const Storage = multer.diskStorage({
-        destination: 'uploads/avatars',
-        filename: (req, file, cb) => {
-                cb(null, `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`);
-        }
-});
-const upload = multer({ storage: Storage });
 
 // SocketIO
 const io = new Server(server);
@@ -72,29 +62,45 @@ io.on("connection", (socket) => {
                 io.to(data.roomID).emit("getSourceChat", sourceChat);
         });
 
-        socket.on("dev", data => {
-                console.log("type: " + typeof data)
-        });
-
         // Recevie a message
         socket.on("message", async (msg) => {
                 msg.message.state = "sended"; // change msg state from loading to sended
+                var mess = listOnlineUser.findIndex((user) => user.userID === msg.idTarget);
 
                 // update last message for room
                 let room;
                 let friend;
                 let presence;
                 if (!msg.idRoom) { // room does not exist 
+                        let lastMsg = msg.message;
+                        if (msg.subMsg) lastMsg.content = msg.subMsg;
                         room = new Room({
                                 users: [msg.idUser, msg.idTarget],
-                                lastMessage: msg.message,
+                                lastMessage: lastMsg,
                                 state: 1
                         });
                         await room.save();
                         friend = await User.findOne({ _id: msg.idTarget });
                         presence = await Presence.findOne({ userID: msg.idTarget });
+                        // Send room data for clients
+                        socket.emit("getRooms", {
+                                room: room,
+                                user: friend,
+                                presence: presence
+                        });
+                        if (mess != -1) {
+                                friend = await User.findOne({ _id: msg.idUser });
+                                presence = await Presence.findOne({ userID: msg.idUser });
+                                listOnlineUser[mess].socket.emit("getRooms", {
+                                        room: room,
+                                        user: friend,
+                                        presence: presence
+                                });
+                        }
                         socket.join(room.id); // create socket room
                 } else {
+                        // let lastMsg = msg.message;
+                        // if (msg.subMsg) lastMsg.content = msg.subMsg;
                         room = await Room.findOne({ _id: msg.idRoom });
                         let oldState = room.state;
                         await Room.findOneAndUpdate(
@@ -107,22 +113,13 @@ io.on("connection", (socket) => {
                                 }
                         );
                         room = await Room.findOne({ _id: msg.idRoom });
-                }
-                // Send room data for clients
-                socket.emit("getRooms", {
-                        room: room,
-                        user: friend ?? null,
-                        presence: presence ?? null
-                });
-                let mess = listOnlineUser.findIndex((user) => user.userID === msg.idTarget);
-                if (mess != -1) {
-                        friend = await User.findOne({ _id: msg.idUser });
-                        presence = await Presence.findOne({ userID: msg.idUser });
-                        listOnlineUser[mess].socket.emit("getRooms", {
+                        // Send room data for clients
+                        socket.emit("getRooms", {
                                 room: room,
-                                user: friend ?? null,
-                                presence: presence ?? null
                         });
+                        if (mess != -1) {
+                                listOnlineUser[mess].socket.emit("getRooms", { room: room, });
+                        }
                 }
 
                 // update source chat
@@ -269,15 +266,7 @@ app.use("/api/chat", chatRouter);
 app.use("/api/user", userRouter);
 app.use('/uploads', express.static('uploads'));
 
-app.post("/upload", upload.single('avatar'), (req, res) => {
-        try {
-                if (req.file) {
-                        return res.json({ path: "/uploads/avatars/" + req.file.filename });
-                }
-        } catch (e) {
-                return res.json({ error: e });
-        }
-});
+
 server.listen(port, () => {
         console.log(`listening on: *${port}`);
 });
