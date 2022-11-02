@@ -14,6 +14,7 @@ const upload = multer({ storage: Storage });
 router.post("/upload", upload.single('img'), (req, res) => {
     try {
             if (req.file) {
+                console.log("new file: "+ "/uploads/chats/" + req.file.filename);
                     return res.json({ path: "/uploads/chats/" + req.file.filename });
             }
     } catch (e) {
