@@ -3,8 +3,8 @@ const app = express();
 const http = require("http");
 const server = http.createServer(app);
 const dotenv = require("dotenv");
-const port = process.env.PORT;
-// const port = 5000;
+// const port = process.env.PORT;
+const port = 5000;
 const mongoose = require("mongoose");
 const authRouter = require("./routes/auth");
 const chatRouter = require("./routes/chat");
@@ -34,6 +34,11 @@ io.on("connection", (socket) => {
         socket.on("joinApp", async (userID) => {
                 console.log("join app " + socket.id);
                 listOnlineUser.push(new UserJoinApp(socket, userID));
+                const time1 = "29/10/2022";
+                const time2 = "02/11/2022";
+                if (time1 < time2) {
+                        console.log("true");
+                }
         });
 
         // Get source chat by roomID
@@ -64,6 +69,7 @@ io.on("connection", (socket) => {
 
         // Recevie a message
         socket.on("message", async (msg) => {
+
                 msg.message.state = "sended"; // change msg state from loading to sended
                 let mess = listOnlineUser.findIndex((user) => user.userID === msg.idTarget);
 
@@ -97,14 +103,14 @@ io.on("connection", (socket) => {
                 } else {
                         let sourceChat = sourceChatDoc.sourceChat;
                         let lastTime = Object.keys(sourceChat).at(-1);
-                        let newTime = msg.message.time;
-                        if (lastTime.split(" ")[1] < newTime.split(" ")[1]) {
-                                sourceChat[msg.message.time] = [[msg.message]];
-                        } else {
+
+                        if (msg.isCurrentTime) {
                                 let lastClusterMsg = sourceChat[lastTime].at(-1);
                                 lastClusterMsg[0].idSender === msg.idUser
                                         ? sourceChat[lastTime].at(-1).push(msg.message)
                                         : sourceChat[lastTime].push([msg.message]);
+                        } else {
+                                sourceChat[msg.message.time] = [[msg.message]];
                         }
                         await SourceChat.updateOne(
                                 { idRoom: room.id },
