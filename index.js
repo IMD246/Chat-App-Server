@@ -34,20 +34,23 @@ io.on("connection", (socket) => {
         socket.on("joinApp", async (userID) => {
                 console.log("join app " + socket.id);
                 listOnlineUser.push(new UserJoinApp(socket, userID));
-                const time1 = "29/10/2022";
-                const time2 = "02/11/2022";
-                if (time1 < time2) {
-                        console.log("true");
-                }
         });
 
         // Get source chat by roomID
         socket.on("joinRoom", async (data) => {
                 socket.join(data.roomID); // create socket room
+                // get source chat and room
                 const sourceChat = await SourceChat.findOne({ idRoom: data.roomID });
-                const room = await Room.findOne({ _id: data.roomID });
+                socket.emit("getSourceChat", sourceChat);
+        });
 
+        // Change state room
+        socket.on("viewMessage", async data => {
+                const room = await Room.findOne({ _id: data.roomID });
+                // Change state of last msg to "viewed" and state to notify is zero
                 if (room.lastMessage.idSender != data.userID) {
+                        const sourceChat = await SourceChat.findOne({ idRoom: data.roomID });
+                        // change to "viewed"
                         let lastTime = Object.keys(sourceChat.sourceChat).at(-1);
                         let updateSourceChat = sourceChat.sourceChat;
                         updateSourceChat[lastTime].at(-1).at(-1).state = "viewed";
@@ -59,24 +62,30 @@ io.on("connection", (socket) => {
                                         }
                                 }
                         );
-
+                        // change state to zero
                         room.state = 0;
                         await room.save();
                         socket.emit("getRooms", { room: room });
+                        io.to(data.roomID).emit("getSourceChat", sourceChat);
                 }
-                io.to(data.roomID).emit("getSourceChat", sourceChat);
         });
+
+        // Exit chat room
+        socket.on("exitRoom", data => {
+                socket.leave(data);
+        });
+
+
+
 
         // Recevie a message
         socket.on("message", async (msg) => {
-
                 msg.message.state = "sended"; // change msg state from loading to sended
+                // find a user is friend of userID (if existed)
                 let mess = listOnlineUser.findIndex((user) => user.userID === msg.idTarget);
-
+                // Get room
                 let room;
-                let friend;
-                let presence;
-                if (!msg.idRoom) { // room does not exist 
+                if (msg.idRoom === '') { // room does not exist 
                         room = new Room({
                                 users: [msg.idUser, msg.idTarget],
                                 lastMessage: lastMsg,
@@ -86,27 +95,28 @@ io.on("connection", (socket) => {
                         socket.join(room.id); // create socket room
                 } else {
                         room = await Room.findOne({ _id: msg.idRoom });
-                        room.state = room.state + 1;
+                        // change room state
+                        let idSender = room.lastMessage.idSender;
+                        room.state = idSender === msg.idUser ? room.state + 1 : 1;
                 }
 
                 // update source chat
                 let sourceChatDoc = await SourceChat.findOne({ idRoom: room.id });
-                if (!sourceChatDoc) {
-                        const initChat = [msg.message];
-                        let objectTime = {};
-                        objectTime[msg.message.time] = [initChat];
+                if (!sourceChatDoc) { // init new source chat
+                        const initClusterMsg = [msg.message];
+                        let newObjectTime = {};
+                        newObjectTime[msg.message.time] = [initClusterMsg];
                         await new SourceChat({
                                 idRoom: room.id,
-                                sourceChat: objectTime
+                                sourceChat: newObjectTime
                         }).save();
                         sourceChatDoc = await SourceChat.findOne({ idRoom: room.id });
                 } else {
-                        let sourceChat = sourceChatDoc.sourceChat;
+                        let sourceChat = sourceChatDoc.sourceChat; // it contains time objects
                         let lastTime = Object.keys(sourceChat).at(-1);
-
                         if (msg.isCurrentTime) {
-                                let lastClusterMsg = sourceChat[lastTime].at(-1);
-                                lastClusterMsg[0].idSender === msg.idUser
+                                // compare senderID of last message with cunrrentID
+                                sourceChat[lastTime].at(-1)[0].idSender === msg.idUser
                                         ? sourceChat[lastTime].at(-1).push(msg.message)
                                         : sourceChat[lastTime].push([msg.message]);
                         } else {
@@ -124,7 +134,7 @@ io.on("connection", (socket) => {
                 io.to(room.id).emit("getSourceChat", sourceChatDoc);
 
                 // update last message
-                if (msg.subMsg) msg.message.content = msg.subMsg;
+                if (msg.subMsg != '') msg.message.content = msg.subMsg;
                 await Room.findOneAndUpdate(
                         { _id: room.id },
                         {
@@ -135,7 +145,9 @@ io.on("connection", (socket) => {
                         }
                 );
                 // Send room data for clients
-                if (!msg.idRoom) {
+                let friend;
+                let presence;
+                if (msg.idRoom == '') {
                         friend = await User.findOne({ _id: msg.idTarget });
                         presence = await Presence.findOne({ userID: msg.idTarget });
                         socket.emit("getRooms", {
