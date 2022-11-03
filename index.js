@@ -3,8 +3,8 @@ const app = express();
 const http = require("http");
 const server = http.createServer(app);
 const dotenv = require("dotenv");
-const port = process.env.PORT;
-// const port = 5000;
+// const port = process.env.PORT;
+const port = 5000;
 const mongoose = require("mongoose");
 const authRouter = require("./routes/auth");
 const chatRouter = require("./routes/chat");
@@ -66,7 +66,7 @@ io.on("connection", (socket) => {
                         room.state = 0;
                         await room.save();
                         socket.emit("getRooms", { room: room });
-                        io.to(data.roomID).emit("getSourceChat", sourceChat);
+                        socket.to(data.roomID).emit("getSourceChat", sourceChat);
                 }
         });
 
@@ -141,6 +141,7 @@ io.on("connection", (socket) => {
                                 }
                         }
                 );
+                room.lastMessage = msg.message;
                 // Send room data for clients
                 let friend;
                 let presence;
@@ -163,6 +164,7 @@ io.on("connection", (socket) => {
                         }
 
                 } else {
+                        console.log("go here");
                         socket.emit("getRooms", { room: room });
                         if (mess != -1) {
                                 listOnlineUser[mess].socket.emit("getRooms", { room: room });

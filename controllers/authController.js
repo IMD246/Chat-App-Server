@@ -196,7 +196,7 @@ exports.register = async (req, res) => {
                         name: req.body.name,
                         password: hashPass,
                         isDarkMode: false,
-                        urlImage: ""
+                        urlImage: "",
                 });
                 const user = await newUser.save();
                 const newPresence = new Presence({
