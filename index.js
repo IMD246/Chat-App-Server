@@ -75,9 +75,6 @@ io.on("connection", (socket) => {
                 socket.leave(data);
         });
 
-
-
-
         // Recevie a message
         socket.on("message", async (msg) => {
                 msg.message.state = "sended"; // change msg state from loading to sended
@@ -88,7 +85,7 @@ io.on("connection", (socket) => {
                 if (msg.idRoom === '') { // room does not exist 
                         room = new Room({
                                 users: [msg.idUser, msg.idTarget],
-                                lastMessage: lastMsg,
+                                lastMessage: msg.message,
                                 state: 1
                         });
                         await room.save();
@@ -133,7 +130,7 @@ io.on("connection", (socket) => {
                 }
                 io.to(room.id).emit("getSourceChat", sourceChatDoc);
 
-                // update last message
+                // update last message of room
                 if (msg.subMsg != '') msg.message.content = msg.subMsg;
                 await Room.findOneAndUpdate(
                         { _id: room.id },
