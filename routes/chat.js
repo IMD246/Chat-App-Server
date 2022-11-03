@@ -5,21 +5,22 @@ const path = require("path");
 
 // add new img into "chats" folder
 const Storage = multer.diskStorage({
-    destination: 'uploads/chats',
-    filename: (req, file, cb) => {
-            cb(null, `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`);
-    }
+        destination: 'uploads/chats',
+        filename: (req, file, cb) => {
+                cb(null, `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`);
+        }
 });
 const upload = multer({ storage: Storage });
-router.post("/upload", upload.single('img'), (req, res) => {
-    try {
-            if (req.file) {
-                console.log("new file: "+ "/uploads/chats/" + req.file.filename);
-                    return res.json({ path: "/uploads/chats/" + req.file.filename });
-            }
-    } catch (e) {
-            return res.json({ error: e });
-    }
+router.post("/multiUpload", upload.array('chats'), (req, res) => {
+        try {
+                let arrPaths = [];
+                req.files.forEach(path => {
+                        arrPaths.push("/uploads/chats/" + path.filename);
+                });
+                return res.json({ paths: arrPaths });
+        } catch (e) {
+                return res.json({ error: e });
+        }
 });
 // remove request from friend reuests
 router.post("/removeRequest", chatController.removeRequest);
