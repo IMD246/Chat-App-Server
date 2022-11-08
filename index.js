@@ -31,8 +31,20 @@ const io = new Server(server);
 var listOnlineUser = [];
 io.on("connection", (socket) => {
         // Join app
-        socket.on("joinApp", async (userID) => {
+        socket.on("joinApp", async userID => {
+                // send request update presence to friends 
+                socket.to(userID).emit('updatePresence',
+                        {
+                                "userID": userID,
+                                "presence": true,
+                        },
+                );
                 console.log("join app " + socket.id);
+                // join room to get request update presence
+                let friendCollection = await Friend.findOne({ userID: userID });
+                friendCollection.friends.forEach(friendID => {
+                        socket.join(friendID); // room to process presence
+                });
                 listOnlineUser.push(new UserJoinApp(socket, userID));
         });
 
@@ -261,6 +273,13 @@ io.on("connection", (socket) => {
                         (user) => user.socket.id === socket.id
                 );
                 const id = listOnlineUser[index].userID;
+                // send request update presence to friends 
+                socket.to(id).emit('updatePresence',
+                        {
+                                "userID": id,
+                                "presence": false,
+                        },
+                );
                 await Presence.findOneAndUpdate(
                         { userID: id },
                         {
@@ -269,9 +288,8 @@ io.on("connection", (socket) => {
                                 }
                         }
                 );
-                console.log("disconnect " + socket.id);
                 listOnlineUser.splice(index, 1);
-                io.emit("updatePresence", "updatePresence");
+                console.log("disconnect " + socket.id);
         });
 });
 

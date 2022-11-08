@@ -136,8 +136,10 @@ exports.loginByToken = async (req, res) => {
                         }
 
                         for (const element of friend.friends) {
-                                let fr = await User.findOne({ _id: element });
-                                listFriend.push(fr);
+                                let objectFriend = {};
+                                objectFriend['friend'] = await User.findOne({ _id: element });
+                                objectFriend['presence'] = await Presence.findOne({ userID: element});
+                                listFriend.push(objectFriend);
                         }
                 }
 
@@ -325,8 +327,10 @@ exports.login = async (req, res) => {
                         }
 
                         for (const element of friend.friends) {
-                                let fr = await User.findOne({ _id: element });
-                                listFriend.push(fr);
+                                let objectFriend = {};
+                                objectFriend['friend'] = await User.findOne({ _id: element });
+                                objectFriend['presence'] = await Presence.findOne({ userID: element});
+                                listFriend.push(objectFriend);
                         }
                 }
 
