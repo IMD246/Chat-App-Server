@@ -3,8 +3,8 @@ const app = express();
 const http = require("http");
 const server = http.createServer(app);
 const dotenv = require("dotenv");
-const port = process.env.PORT;
-// const port = 5000;
+// const port = process.env.PORT;
+const port = 5000;
 const mongoose = require("mongoose");
 const authRouter = require("./routes/auth");
 const chatRouter = require("./routes/chat");
@@ -16,6 +16,15 @@ const SourceChat = require("./models/SourceChat");
 const Room = require("./models/Room");
 const User = require("./models/User");
 const Friend = require("./models/Friend");
+const firebase = require("firebase-admin");
+const serviceAccount = require("./secrets/chitchat-2201f-firebase-adminsdk-pbl8v-888b056fb8.json");
+const AccessToken = require("./models/AccessToken");
+
+firebase.initializeApp({
+        credential: firebase.credential.cert(serviceAccount)
+});
+
+
 
 dotenv.config();
 app.use(express.json());
@@ -92,6 +101,7 @@ io.on("connection", (socket) => {
                 msg.message.state = "sended"; // change msg state from loading to sended
                 // find a user is friend of userID (if existed)
                 let mess = listOnlineUser.findIndex((user) => user.userID === msg.idTarget);
+
                 // Get room
                 let room;
                 if (msg.idRoom === '') { // room does not exist 
@@ -154,12 +164,11 @@ io.on("connection", (socket) => {
                         }
                 );
                 room.lastMessage = msg.message;
+
                 // Send room data for clients
-                let friend;
-                let presence;
                 if (msg.idRoom == '') {
-                        friend = await User.findOne({ _id: msg.idTarget });
-                        presence = await Presence.findOne({ userID: msg.idTarget });
+                        let friend = await User.findOne({ _id: msg.idTarget });
+                        let presence = await Presence.findOne({ userID: msg.idTarget });
                         socket.emit("getRooms", {
                                 room: room,
                                 user: friend,
@@ -176,12 +185,30 @@ io.on("connection", (socket) => {
                         }
 
                 } else {
-                        console.log("go here");
                         socket.emit("getRooms", { room: room });
                         if (mess != -1) {
                                 listOnlineUser[mess].socket.emit("getRooms", { room: room });
                         }
                 }
+
+                // push notification for friend if he don't online
+                if (mess != -1) return;
+
+                // get device token to push notification
+                let friendToken = await AccessToken.findOne({ userID: msg.idTarget });
+                if(!friendToken) return;
+
+                let currentUser = await User.findOne({_id: msg.idUser});
+                await firebase.messaging().sendMulticast({
+                        tokens: [friendToken.deviceToken],
+                        notification: {
+                                title: "ChitChat",
+                                body: "New message from " + currentUser.name,
+                                imageUrl: currentUser.urlImage.toString(),
+                        },
+                }).catch(function (error) {
+                        console.log("ERROR: ", error);
+                });
         });
 
         // Add a new friend request

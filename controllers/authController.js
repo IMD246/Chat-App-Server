@@ -274,6 +274,7 @@ exports.login = async (req, res) => {
                 } else {
                         const access = new AccessToken({
                                 accessToken: accessToken,
+                                deviceToken: req.body.deviceToken,
                                 userID: user.id
                         }
                         );
