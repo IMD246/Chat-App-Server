@@ -22,6 +22,14 @@ router.post("/multiUpload", upload.array('chats'), (req, res) => {
                 return res.json({ error: e });
         }
 });
+
+router.post("/upload", upload.single('chats'), (req, res) => {
+        try {
+                return res.json({ path: "/uploads/chats/" + req.file.filename });
+        } catch (e) {
+                return res.json({ error: e });
+        }
+});
 // remove request from friend reuests
 router.post("/removeRequest", chatController.removeRequest);
 // get friend requests

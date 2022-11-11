@@ -14,7 +14,6 @@ const Storage = multer.diskStorage({
 const upload = multer({ storage: Storage });
 router.post("/upload", upload.single('avatars'), async (req, res) => {
     try {
-        console.log("userID: "+req.body.userID);
         await User.findByIdAndUpdate(
             { _id: req.body.userID },
             {
