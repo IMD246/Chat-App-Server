@@ -163,8 +163,8 @@ io.on("connection", (socket) => {
                                 }
                         }
                 );
-                room.lastMessage = msg.message;
-
+                // room.lastMessage = msg.message;
+                room = await Room.findOne({ _id: room.id}); // get time update and new lastMsg
                 // Send room data for clients
                 if (msg.idRoom == '') {
                         let friend = await User.findOne({ _id: msg.idTarget });
