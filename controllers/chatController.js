@@ -237,12 +237,17 @@ exports.findAUser = async (req, res) => {
             ));
         }
 
+        const presence = await Presence.findOne({ userID: user.id});
+
         const friend = await Friend.findOne({ userID: user.id });
         if (!friend) {
             return res.status(200).json(new BaseResponse(
                 1,
                 Date.now(),
-                user,
+                {
+                    'friend': user,
+                    'presence': presence
+                },
                 new Errors(
                     200,
                     "Successfully!",
@@ -252,7 +257,6 @@ exports.findAUser = async (req, res) => {
 
         let result = friend.requests.findIndex(request => request['userID'] == req.body.userID);
         if (!result) {
-            console.log("result: "+result);
             return res.status(200).json(new BaseResponse(
                 -1,
                 Date.now(),
@@ -266,7 +270,10 @@ exports.findAUser = async (req, res) => {
         return res.status(200).json(new BaseResponse(
             1,
             Date.now(),
-            user,
+            {
+                'friend': user,
+                'presence': presence
+            },
             new Errors(
                 200,
                 "Successfully!",

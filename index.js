@@ -51,9 +51,12 @@ io.on("connection", (socket) => {
                 console.log("join app " + socket.id);
                 // join room to get request update presence
                 let friendCollection = await Friend.findOne({ userID: userID });
-                friendCollection.friends.forEach(friendID => {
-                        socket.join(friendID); // room to process presence
-                });
+                if (friendCollection != null) {
+                        friendCollection.friends.forEach(friendID => {
+                                socket.join(friendID); // room to process presence
+                        });
+                }
+
                 listOnlineUser.push(new UserJoinApp(socket, userID));
         });
 
@@ -164,7 +167,7 @@ io.on("connection", (socket) => {
                         }
                 );
                 // room.lastMessage = msg.message;
-                room = await Room.findOne({ _id: room.id}); // get time update and new lastMsg
+                room = await Room.findOne({ _id: room.id }); // get time update and new lastMsg
                 // Send room data for clients
                 if (msg.idRoom == '') {
                         let friend = await User.findOne({ _id: msg.idTarget });
@@ -196,9 +199,9 @@ io.on("connection", (socket) => {
 
                 // get device token to push notification
                 let friendToken = await AccessToken.findOne({ userID: msg.idTarget });
-                if(!friendToken) return;
+                if (!friendToken) return;
 
-                let currentUser = await User.findOne({_id: msg.idUser});
+                let currentUser = await User.findOne({ _id: msg.idUser });
                 await firebase.messaging().sendMulticast({
                         tokens: [friendToken.deviceToken],
                         notification: {
